@@ -1,0 +1,51 @@
+name: Motor Mektebi Manim Video Render
+
+on:
+  repository_dispatch:
+    types: [manim_render_event]
+
+jobs:
+  render_video:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Depoyu Bilgisayara Çek
+      uses: actions/checkout@v4
+
+    - name: Python Kurulumu
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Sistem Bağımlılıklarını Kur (Manim ve FFmpeg için)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg libpango1.0-dev libcairo2-dev pkg-config freeglut3-dev texlive-full
+
+    - name: Python Kütüphanelerini Kur
+      run: |
+        python -m pip install --upgrade pip
+        pip install manim requests
+
+    - name: Manim Kodunu ve Verileri Hazırla
+      run: |
+        cat << 'EOF' > scene.py
+        ${{ github.event.client_payload.manim_code }}
+        EOF
+        
+        echo "Ses dosyası indiriliyor..."
+        curl -L "${{ github.event.client_payload.audio_url }}" -o background_audio.mp3
+
+    - name: Videoyu Manim ile Çiz (Render)
+      run: |
+        manim -qv scene.py -o raw_animation.mp4
+
+    - name: Ses ve Videoyu FFmpeg ile Birleştir
+      run: |
+        ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
+
+    - name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ github.event.client_payload.video_title }}
+        path: output_video.mp4
