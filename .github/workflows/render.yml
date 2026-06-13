@@ -1,88 +1,41 @@
-name: Motor Mektebi Manim Video Render
+name: Motor Mektebi Manim Video Renderon:repository_dispatch:types: [manim_render_event]jobs:render_video:runs-on: ubuntu-lateststeps:
+- name: Depoyu Bilgisayara Çek
+  uses: actions/checkout@v4
+  with:
+    ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
 
-on:
-  repository_dispatch:
-    types: [manim_render_event]
+- name: Python Kurulumu
+  uses: actions/setup-python@v5
+  with:
+    python-version: '3.10'
 
-jobs:
-  render_video:
-    runs-on: ubuntu-latest
+- name: Sistem Bağımlılıklarını Kur
+  run: |
+    sudo apt-get update
+    sudo apt-get install -y ffmpeg libpango1.0-dev libcairo2-dev pkg-config freeglut3-dev
 
-    steps:
-    - name: Depoyu Bilgisayara Çek
-      uses: actions/checkout@v4
-      with:
-        ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
+- name: Python Kütüphanelerini Kur
+  run: |
+    python -m pip install --upgrade pip
+    pip install manim requests
 
-    - name: Python Kurulumu
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+- name: Manim Kodunu Hazırla
+  run: |
+    # Gemini'dan gelen hatasız kodu doğrudan dosyaya yazar
+    cat << 'EOF' > scene.py
+    ${{ github.event.client_payload.manim_code }}
+    EOF
 
-    - name: Sistem Bağımlılıklarını Kur
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y ffmpeg libpango1.0-dev libcairo2-dev pkg-config freeglut3-dev
+- name: Videoyu Manim ile Çiz
+  run: |
+    manim -ql scene.py -o raw_animation.mp4
 
-    - name: Python Kütüphanelerini Kur
-      run: |
-        python -m pip install --upgrade pip
-        pip install manim requests
+- name: Ses ve Videoyu FFmpeg ile Birleştir
+  run: |
+    ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
 
-    - name: Manim Kodunu ve Kapanış Sahnesini Hazırla
-      run: |
-        # Gemini'dan gelen ham kodu al
-        cat << 'EOF' > raw_scene.py
-        ${{ github.event.client_payload.manim_code }}
-        EOF
-
-        # Python kullanarak hata riski olmadan kapanış kodunu güvenli şekilde ekleyen script
-        cat << 'EOF' > append_outro.py
-        with open("raw_scene.py", "r") as f:
-            out_code = f.read()
-        
-        # Otomatik Kapanış Sahnesi Kodları
-        outro_slug = """
-        # Motor Mektebi Otomatik Kapanış
-        self.wait(1)
-        outro_bg = FullScreenRectangle(color="#111111", fill_opacity=1)
-        logo_text = Text("MOTOR MEKTEBİ", font="sans-serif", font_size=48, color="#FF6B00")
-        sub_text = Text("Abone Olmayı Unutma!", font="sans-serif", font_size=28, color="#FFFFFF")
-        sub_text.next_to(logo_text, DOWN, buff=0.5)
-        
-        self.play(FadeIn(outro_bg))
-        self.play(Write(logo_text), run_time=1.5)
-        self.play(FadeIn(sub_text))
-        self.wait(3)
-        """
-        
-        # Satırları güvenli bir şekilde ayırıp 8 boşluk girinti (indentation) ekleyelim
-        outro_lines = []
-        for line in outro_slug.splitlines():
-            if line.strip():
-                outro_lines.append("        " + line)
-            else:
-                outro_lines.append("")
-                
-        outro_indented = "\n".join(outro_lines)
-        
-        # İki kodu pürüzsüzce birleştirip asıl scene.py dosyasını yazalım
-        with open("scene.py", "w") as f:
-            f.write(out_code + "\n" + outro_indented)
-        EOF
-        
-        python append_outro.py
-
-    - name: Videoyu Manim ile Çiz
-      run: |
-        manim -ql scene.py -o raw_animation.mp4
-
-    - name: Ses ve Videoyu FFmpeg ile Birleştir
-      run: |
-        ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
-
-    - name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
-      uses: actions/upload-artifact@v4
-      with:
-        name: motor-mektebi-video-${{ github.run_number }}
-        path: output_video.mp4
+- name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
+  uses: actions/upload-artifact@v4
+  with:
+    name: motor-mektebi-video-${{ github.run_number }}
+    path: output_video.mp4
