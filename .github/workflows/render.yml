@@ -12,7 +12,7 @@ jobs:
     - name: Depoyu Bilgisayara Çek
       uses: actions/checkout@v4
       with:
-        ref: main
+        ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
 
     - name: Python Kurulumu
       uses: actions/setup-python@v5
@@ -36,15 +36,10 @@ jobs:
         ${{ github.event.client_payload.manim_code }}
         EOF
 
-        # Gemini'ın kodunun sonuna otomatik "Motor Mektebi" kapanış animasyonu enjekte eden sihirli dokunuş
+        # Python kullanarak hata riski olmadan kapanış kodunu güvenli şekilde ekleyen script
         cat << 'EOF' > append_outro.py
         with open("raw_scene.py", "r") as f:
-            lines = f.readlines()
-        
-        # Son 'self.wait()' satırını bul veya sınıfın sonuna ekle
-        out_code = ""
-        for line in lines:
-            out_code += line
+            out_code = f.read()
         
         # Otomatik Kapanış Sahnesi Kodları
         outro_slug = """
@@ -61,13 +56,19 @@ jobs:
         self.wait(3)
         """
         
-        # Kodu sınıfa uygun girintiyle (indentation) enjekte et
-        # Genellikle Manim sınıflarında 8 boşluk girinti kullanılır
-        outro_indented = "\\n".join(["        " + l if l.strip() else "" for l in outro_slug.split("\\n")])
+        # Satırları güvenli bir şekilde ayırıp 8 boşluk girinti (indentation) ekleyelim
+        outro_lines = []
+        for line in outro_slug.splitlines():
+            if line.strip():
+                outro_lines.append("        " + line)
+            else:
+                outro_lines.append("")
+                
+        outro_indented = "\n".join(outro_lines)
         
-        # Dosyanın sonuna ekle (construct fonksiyonunun içine)
+        # İki kodu pürüzsüzce birleştirip asıl scene.py dosyasını yazalım
         with open("scene.py", "w") as f:
-            f.write(out_code + "\\n" + outro_indented)
+            f.write(out_code + "\n" + outro_indented)
         EOF
         
         python append_outro.py
