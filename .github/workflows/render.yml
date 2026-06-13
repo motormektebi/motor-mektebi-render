@@ -42,7 +42,16 @@ jobs:
 
     - name: Ses ve Videoyu FFmpeg ile Birleştir
       run: |
-        ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
+        # Manim'in ürettiği mp4 dosyasını klasör ve sınıf ismi ne olursa olsun otomatik buluruz
+        RAW_VIDEO=$(find media -name "*.mp4" | head -n 1)
+        echo "Bulunan ham video yolu: $RAW_VIDEO"
+        
+        if [ -z "$RAW_VIDEO" ]; then
+          echo "Hata: Manim tarafından üretilen video dosyası bulunamadı!"
+          exit 1
+        fi
+        
+        ffmpeg -i "$RAW_VIDEO" -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
 
     - name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
       uses: actions/upload-artifact@v4
