@@ -12,7 +12,7 @@ jobs:
     - name: Depoyu Bilgisayara Çek
       uses: actions/checkout@v4
       with:
-        ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
+        ref: main
 
     - name: Python Kurulumu
       uses: actions/setup-python@v5
@@ -29,11 +29,48 @@ jobs:
         python -m pip install --upgrade pip
         pip install manim requests
 
-    - name: Manim Kodunu Hazırla
+    - name: Manim Kodunu ve Kapanış Sahnesini Hazırla
       run: |
-        cat << 'EOF' > scene.py
+        # Gemini'dan gelen ham kodu al
+        cat << 'EOF' > raw_scene.py
         ${{ github.event.client_payload.manim_code }}
         EOF
+
+        # Gemini'ın kodunun sonuna otomatik "Motor Mektebi" kapanış animasyonu enjekte eden sihirli dokunuş
+        cat << 'EOF' > append_outro.py
+        with open("raw_scene.py", "r") as f:
+            lines = f.readlines()
+        
+        # Son 'self.wait()' satırını bul veya sınıfın sonuna ekle
+        out_code = ""
+        for line in lines:
+            out_code += line
+        
+        # Otomatik Kapanış Sahnesi Kodları
+        outro_slug = """
+        # Motor Mektebi Otomatik Kapanış
+        self.wait(1)
+        outro_bg = FullScreenRectangle(color="#111111", fill_opacity=1)
+        logo_text = Text("MOTOR MEKTEBİ", font="sans-serif", font_size=48, color="#FF6B00")
+        sub_text = Text("Abone Olmayı Unutma!", font="sans-serif", font_size=28, color="#FFFFFF")
+        sub_text.next_to(logo_text, DOWN, buff=0.5)
+        
+        self.play(FadeIn(outro_bg))
+        self.play(Write(logo_text), run_time=1.5)
+        self.play(FadeIn(sub_text))
+        self.wait(3)
+        """
+        
+        # Kodu sınıfa uygun girintiyle (indentation) enjekte et
+        # Genellikle Manim sınıflarında 8 boşluk girinti kullanılır
+        outro_indented = "\\n".join(["        " + l if l.strip() else "" for l in outro_slug.split("\\n")])
+        
+        # Dosyanın sonuna ekle (construct fonksiyonunun içine)
+        with open("scene.py", "w") as f:
+            f.write(out_code + "\\n" + outro_indented)
+        EOF
+        
+        python append_outro.py
 
     - name: Videoyu Manim ile Çiz
       run: |
