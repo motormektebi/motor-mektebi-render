@@ -1,41 +1,51 @@
-name: Motor Mektebi Manim Video Renderon:repository_dispatch:types: [manim_render_event]jobs:render_video:runs-on: ubuntu-lateststeps:
-- name: Depoyu Bilgisayara Çek
-  uses: actions/checkout@v4
-  with:
-    ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
+name: Motor Mektebi Manim Video Render
 
-- name: Python Kurulumu
-  uses: actions/setup-python@v5
-  with:
-    python-version: '3.10'
+on:
+  repository_dispatch:
+    types: [manim_render_event]
 
-- name: Sistem Bağımlılıklarını Kur
-  run: |
-    sudo apt-get update
-    sudo apt-get install -y ffmpeg libpango1.0-dev libcairo2-dev pkg-config freeglut3-dev
+jobs:
+  render_video:
+    runs-on: ubuntu-latest
 
-- name: Python Kütüphanelerini Kur
-  run: |
-    python -m pip install --upgrade pip
-    pip install manim requests
+    steps:
+    - name: Depoyu Bilgisayara Çek
+      uses: actions/checkout@v4
+      with:
+        ref: main # En güncel PUT edilen ses dosyasını alabilmesi için ana dalı çeker
 
-- name: Manim Kodunu Hazırla
-  run: |
-    # Gemini'dan gelen hatasız kodu doğrudan dosyaya yazar
-    cat << 'EOF' > scene.py
-    ${{ github.event.client_payload.manim_code }}
-    EOF
+    - name: Python Kurulumu
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
 
-- name: Videoyu Manim ile Çiz
-  run: |
-    manim -ql scene.py -o raw_animation.mp4
+    - name: Sistem Bağımlılıklarını Kur
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg libpango1.0-dev libcairo2-dev pkg-config freeglut3-dev
 
-- name: Ses ve Videoyu FFmpeg ile Birleştir
-  run: |
-    ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
+    - name: Python Kütüphanelerini Kur
+      run: |
+        python -m pip install --upgrade pip
+        pip install manim requests
 
-- name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
-  uses: actions/upload-artifact@v4
-  with:
-    name: motor-mektebi-video-${{ github.run_number }}
-    path: output_video.mp4
+    - name: Manim Kodunu Hazırla
+      run: |
+        # Gemini'dan gelen dikey formatlı kodu doğrudan dosyaya yazar
+        cat << 'EOF' > scene.py
+        ${{ github.event.client_payload.manim_code }}
+        EOF
+
+    - name: Videoyu Manim ile Çiz
+      run: |
+        manim -ql scene.py -o raw_animation.mp4
+
+    - name: Ses ve Videoyu FFmpeg ile Birleştir
+      run: |
+        ffmpeg -i media/videos/scene/480p15/raw_animation.mp4 -i background_audio.mp3 -c:v copy -c:a aac -map 0:v:0 -map 1:a:0 output_video.mp4
+
+    - name: Bitmiş Videoyu GitHub'a Kaydet (Geçici)
+      uses: actions/upload-artifact@v4
+      with:
+        name: motor-mektebi-video-${{ github.run_number }}
+        path: output_video.mp4
